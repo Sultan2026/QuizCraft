@@ -18,12 +18,19 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    const { error } = await signIn(email, password);
-    
-    if (error) {
-      setError(error.message);
-    } else {
-      router.push('/dashboard');
+    try {
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        console.error('Login error:', error);
+        setError(error.message || 'Login failed. Please try again.');
+      } else {
+        console.log('Login successful, redirecting...');
+        router.push('/dashboard');
+      }
+    } catch (err) {
+      console.error('Unexpected login error:', err);
+      setError('An unexpected error occurred. Please try again.');
     }
     
     setLoading(false);
