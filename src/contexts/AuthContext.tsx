@@ -8,9 +8,9 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signOut: () => Promise<void>;
+  signUp: (email: string, password: string) => Promise<{ error: any; data?: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: any; data?: any }>;
+  signOut: () => Promise<{ error: any }>;
   resetPassword: (email: string) => Promise<{ error: any }>;
 }
 
@@ -43,41 +43,109 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     try {
+      console.log('Starting sign up process for:', email);
+      
+      // Basic validation
+      if (!email || !password) {
+        const error = { message: 'Email and password are required' };
+        console.error('Validation error:', error);
+        return { error };
+      }
+
+      if (password.length < 6) {
+        const error = { message: 'Password must be at least 6 characters' };
+        console.error('Validation error:', error);
+        return { error };
+      }
+
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim().toLowerCase(),
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+        },
       });
-      console.log('Sign up result:', { data, error });
-      return { error };
-    } catch (err) {
+      
+      console.log('Sign up result:', { 
+        user: data.user?.id, 
+        session: !!data.session, 
+        error: error?.message 
+      });
+      
+      return { data, error };
+    } catch (err: any) {
       console.error('Sign up error:', err);
-      return { error: err };
+      return { error: { message: err.message || 'An unexpected error occurred during sign up' } };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('Starting sign in process for:', email);
+      
+      // Basic validation
+      if (!email || !password) {
+        const error = { message: 'Email and password are required' };
+        console.error('Validation error:', error);
+        return { error };
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password,
       });
-      console.log('Sign in result:', { data, error });
-      return { error };
-    } catch (err) {
+      
+      console.log('Sign in result:', { 
+        user: data.user?.id, 
+        session: !!data.session, 
+        error: error?.message 
+      });
+      
+      return { data, error };
+    } catch (err: any) {
       console.error('Sign in error:', err);
-      return { error: err };
+      return { error: { message: err.message || 'An unexpected error occurred during sign in' } };
     }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      console.log('Starting sign out process');
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Sign out error:', error);
+        return { error };
+      }
+      
+      console.log('Sign out successful');
+      return { error: null };
+    } catch (err: any) {
+      console.error('Sign out error:', err);
+      return { error: { message: err.message || 'An unexpected error occurred during sign out' } };
+    }
   };
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    return { error };
+    try {
+      console.log('Starting password reset for:', email);
+      
+      if (!email) {
+        const error = { message: 'Email is required' };
+        console.error('Validation error:', error);
+        return { error };
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      console.log('Password reset result:', { error: error?.message });
+      return { error };
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      return { error: { message: err.message || 'An unexpected error occurred during password reset' } };
+    }
   };
 
   const value = {
