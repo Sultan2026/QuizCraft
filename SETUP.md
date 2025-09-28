@@ -10,10 +10,10 @@ npm install
 ### 2. Set up Supabase
 1. Go to [supabase.com](https://supabase.com) and create a new project
 2. Copy your project URL and anon key from the project settings
-3. Copy `env.template` to `.env.local` and fill in your Supabase credentials:
+3. Copy `env.template` to `.env.local` (credentials already filled in):
    ```
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url_here
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+   NEXT_PUBLIC_SUPABASE_URL=https://vtlreexibyyknczezago.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0bHJlZXhpYnl5a25jemV6YWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMzEyNjcsImV4cCI6MjA3NDYwNzI2N30.T32AtKyPHl6-WsrOySk_Zud-o896uvJKwd9R4FUacck
    ```
 
 ### 3. Set up Database
@@ -26,6 +26,14 @@ npm install
 ```bash
 npm run dev
 ```
+
+### 5. Deploy to Vercel
+1. Go to [vercel.com](https://vercel.com) and sign in with GitHub (Sultan2026)
+2. Click "Import Project" and select `Sultan2026/QuizCraft`
+3. Add environment variables in Vercel dashboard:
+   - `NEXT_PUBLIC_SUPABASE_URL`: https://vtlreexibyyknczezago.supabase.co
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0bHJlZXhpYnl5a25jemV6YWdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMzEyNjcsImV4cCI6MjA3NDYwNzI2N30.T32AtKyPHl6-WsrOySk_Zud-o896uvJKwd9R4FUacck
+4. Deploy! Every push to Sultan2026/QuizCraft will auto-deploy
 
 ## Database Tables
 
