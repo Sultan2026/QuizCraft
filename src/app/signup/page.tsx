@@ -33,12 +33,19 @@ export default function SignupPage() {
       return;
     }
 
-    const { error } = await signUp(email, password);
-    
-    if (error) {
-      setError(error.message);
-    } else {
-      setMessage('Check your email for a confirmation link!');
+    try {
+      const { error } = await signUp(email, password);
+      
+      if (error) {
+        console.error('Signup error:', error);
+        setError(error.message || 'Signup failed. Please try again.');
+      } else {
+        console.log('Signup successful');
+        setMessage('Check your email for a confirmation link!');
+      }
+    } catch (err) {
+      console.error('Unexpected signup error:', err);
+      setError('An unexpected error occurred. Please try again.');
     }
     
     setLoading(false);
@@ -142,5 +149,9 @@ export default function SignupPage() {
     </div>
   );
 }
+
+
+
+
 
 
