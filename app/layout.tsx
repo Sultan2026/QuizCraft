@@ -8,14 +8,12 @@ import "./globals.css"
 // Main sans-serif font (replaces Geist)
 const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-inter",
   weight: ["400", "700"],
 })
 
 // Monospace font (replaces Geist Mono)
 const firaCode = Fira_Code({
   subsets: ["latin"],
-  variable: "--font-fira-code",
   weight: ["400", "700"],
 })
 
@@ -32,10 +30,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`font-sans ${inter.variable} ${firaCode.variable} antialiased`}
-      >
+    <html lang="en" className={`${inter.className} ${firaCode.className}`}>
+      <body className="antialiased">
         <ThemeProvider defaultTheme="system" storageKey="quizcraft-ui-theme">
           <Suspense fallback={null}>{children}</Suspense>
         </ThemeProvider>
