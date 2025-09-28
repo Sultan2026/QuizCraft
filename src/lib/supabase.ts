@@ -146,3 +146,4 @@ export const supabaseHelpers = {
     if (error) throw error;
   }
 };
+

@@ -29,3 +29,5 @@ echo 2. Set up SSH keys
 echo 3. Check repository permissions
 
 pause
+
+

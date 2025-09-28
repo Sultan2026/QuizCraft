@@ -68,3 +68,4 @@ export interface UpdateQuestionData {
   correct_answer?: string;
   options?: string[];
 }
+
