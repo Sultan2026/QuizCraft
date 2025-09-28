@@ -1,18 +1,22 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Inter, Fira_Code } from "next/font/google"
 import { Suspense } from "react"
 import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
-const geistSans = Geist({
+// Main sans-serif font (replaces Geist)
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-geist-sans",
+  variable: "--font-inter",
+  weight: ["400", "700"],
 })
 
-const geistMono = Geist_Mono({
+// Monospace font (replaces Geist Mono)
+const firaCode = Fira_Code({
   subsets: ["latin"],
-  variable: "--font-geist-mono",
+  variable: "--font-fira-code",
+  weight: ["400", "700"],
 })
 
 export const metadata: Metadata = {
@@ -29,7 +33,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`font-sans ${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body
+        className={`font-sans ${inter.variable} ${firaCode.variable} antialiased`}
+      >
         <ThemeProvider defaultTheme="system" storageKey="quizcraft-ui-theme">
           <Suspense fallback={null}>{children}</Suspense>
         </ThemeProvider>
