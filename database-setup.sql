@@ -4,9 +4,9 @@
 -- Enable Row Level Security
 ALTER DATABASE postgres SET "app.jwt_secret" TO 'your-jwt-secret';
 
--- Create users table
+-- Create users table (integrates with Supabase Auth)
 CREATE TABLE IF NOT EXISTS users (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -96,3 +96,18 @@ CREATE POLICY "Users can delete questions of own quizzes" ON questions
             WHERE user_id::text = auth.uid()::text
         )
     );
+
+-- Function to automatically create user profile on signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, email)
+  VALUES (NEW.id, NEW.email);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to automatically create user profile
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

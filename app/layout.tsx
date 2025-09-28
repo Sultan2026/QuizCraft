@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter, Fira_Code } from "next/font/google"
 import { Suspense } from "react"
 import { ThemeProvider } from "@/components/theme-provider"
+import { AuthProvider } from "@/contexts/AuthContext"
 import "./globals.css"
 
 // Main sans-serif font (replaces Geist)
@@ -32,9 +33,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.className} ${firaCode.className}`}>
       <body className="antialiased">
-        <ThemeProvider defaultTheme="system" storageKey="quizcraft-ui-theme">
-          <Suspense fallback={null}>{children}</Suspense>
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider defaultTheme="system" storageKey="quizcraft-ui-theme">
+            <Suspense fallback={null}>{children}</Suspense>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   )
