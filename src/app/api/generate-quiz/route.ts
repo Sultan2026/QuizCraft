@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import pdfParse from "pdf-parse";
+import pdfParse from "pdf-parse-fork";
 
 // If you have a shared Prisma client util, replace this with that import
 // and remove the inline instantiation below.
