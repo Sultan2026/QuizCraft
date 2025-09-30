@@ -29,29 +29,14 @@ export default function LandingPage() {
   const handleGenerateQuiz = async () => {
     if (!uploadedFile && !customText.trim()) return
 
-    setIsGenerating(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-
-      console.log("[v0] Quiz generated successfully!", {
-        hasFile: !!uploadedFile,
-        textLength: customText.length,
-        inputMode,
-      })
-
-      setIsGenerating(false)
-
-      alert("🎉 Quiz generated successfully! You'll be redirected to your new quiz...")
-
-      // Reset form
-      setUploadedFile(null)
-      setCustomText("")
-      setInputMode("text")
-    } catch (error) {
-      console.error("[v0] Error generating quiz:", error)
-      setIsGenerating(false)
-      alert("❌ Error generating quiz. Please try again.")
+    // Redirect to login if not authenticated
+    if (!user) {
+      router.push('/login')
+      return
     }
+
+    // Redirect to create page for authenticated users
+    router.push('/create')
   }
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +50,7 @@ export default function LandingPage() {
 
       setUploadedFile(file)
       setCustomText("") // Clear text when file is uploaded
-      console.log("[v0] File uploaded:", file.name, file.type, file.size)
+      console.log("File uploaded:", file.name, file.type, file.size)
     }
   }
 
@@ -334,10 +319,13 @@ export default function LandingPage() {
           <Button
             size="lg"
             variant="secondary"
+            asChild
             className="px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all"
           >
-            Start Creating Now
-            <span className="ml-2">→</span>
+            <Link href="/signup">
+              Start Creating Now
+              <span className="ml-2">→</span>
+            </Link>
           </Button>
         </div>
       </section>

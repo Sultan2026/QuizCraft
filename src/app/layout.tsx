@@ -1,28 +1,28 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter, Fira_Code } from "next/font/google"
+import { Geist, Geist_Mono } from "next/font/google"
 import { Suspense } from "react"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/AuthContext"
+import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
-// Main sans-serif font (replaces Geist)
-const inter = Inter({
+// Main sans-serif font
+const geistSans = Geist({
   subsets: ["latin"],
-  weight: ["400", "700"],
+  variable: "--font-geist-sans",
 })
 
-// Monospace font (replaces Geist Mono)
-const firaCode = Fira_Code({
+// Monospace font
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  weight: ["400", "700"],
+  variable: "--font-geist-mono",
 })
 
 export const metadata: Metadata = {
-  title: "QuizCraft Simple - Turn Documents into Quizzes in Seconds",
+  title: "QuizCraft - Turn Documents into Quizzes in Seconds",
   description:
     "Transform any document into engaging quizzes instantly with AI. Perfect for educators, trainers, and content creators.",
-  generator: "v0.app",
 }
 
 export default function RootLayout({
@@ -31,11 +31,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${inter.className} ${firaCode.className}`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <body className="antialiased">
         <AuthProvider>
           <ThemeProvider defaultTheme="system" storageKey="quizcraft-ui-theme">
             <Suspense fallback={null}>{children}</Suspense>
+            <Toaster />
           </ThemeProvider>
         </AuthProvider>
       </body>

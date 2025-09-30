@@ -1,32 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
-export default function ResetPasswordPage() {
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+export default function ResetPage() {
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    // Check if we have the necessary tokens in the URL
-    const accessToken = searchParams.get('access_token');
-    const refreshToken = searchParams.get('refresh_token');
-    
-    if (accessToken && refreshToken) {
-      // Set the session with the tokens from the URL
-      supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-    }
-  }, [searchParams]);
+  const { resetPassword } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,121 +21,92 @@ export default function ResetPasswordPage() {
     setError('');
     setMessage('');
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
+    // Client-side validation
+    if (!email.trim()) {
+      setError('Email is required');
       setLoading(false);
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!email.includes('@')) {
+      setError('Please enter a valid email address');
       setLoading(false);
       return;
     }
 
-    const { error } = await supabase.auth.updateUser({
-      password: password
-    });
-    
-    if (error) {
-      setError(error.message);
-    } else {
-      setMessage('Password updated successfully! Redirecting to login...');
-      setTimeout(() => {
-        router.push('/login');
-      }, 2000);
+    try {
+      console.log('Sending password reset for:', email);
+      const { error } = await resetPassword(email.trim());
+      
+      if (error) {
+        console.error('Reset password error:', error);
+        setError(error.message || 'Failed to send reset link. Please try again.');
+      } else {
+        console.log('Reset email sent successfully');
+        setMessage('Check your email for a password reset link!');
+        setEmail(''); // Clear form on success
+      }
+    } catch (err: any) {
+      console.error('Unexpected reset password error:', err);
+      setError('An unexpected error occurred. Please try again.');
     }
     
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Set new password
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Enter your new password below.
-          </p>
-        </div>
-        
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                New Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="Enter new password (min 6 characters)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">Reset password</CardTitle>
+          <CardDescription>Enter your email to receive a reset link</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="Enter your email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                required 
               />
             </div>
-            
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                Confirm New Password
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="Confirm new password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-            </div>
-          </div>
 
-          {error && (
-            <div className="text-red-600 text-sm text-center">
-              {error}
-            </div>
-          )}
+            {error && (
+              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
+                {error}
+              </div>
+            )}
 
-          {message && (
-            <div className="text-green-600 text-sm text-center">
-              {message}
-            </div>
-          )}
+            {message && (
+              <div className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-md p-3">
+                {message}
+              </div>
+            )}
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            <Button 
+              type="submit" 
+              className="w-full"
+              disabled={loading || !email.trim()}
             >
-              {loading ? 'Updating...' : 'Update password'}
-            </button>
-          </div>
+              {loading ? 'Sending...' : 'Send Reset Link'}
+            </Button>
+          </form>
 
           <div className="text-center">
-            <Link
-              href="/login"
-              className="font-medium text-indigo-600 hover:text-indigo-500"
-            >
-              Back to sign in
-            </Link>
+            <div className="text-sm text-muted-foreground">
+              Remember your password?{" "}
+              <Link href="/login" className="text-primary hover:underline underline-offset-4">
+                Sign in
+              </Link>
+            </div>
           </div>
-        </form>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
-
-
-
-
-
-
