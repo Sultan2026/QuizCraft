@@ -39,6 +39,9 @@ async function readMultipartOrText(request: NextRequest): Promise<{ text: string
 
     if (file) {
       const buffer = Buffer.from(await file.arrayBuffer());
+      if (buffer.byteLength > 3 * 1024 * 1024) {
+        throw new Error("File exceeds 3MB limit");
+      }
       let extracted = "";
       if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
         const pdfData = await pdfParse(buffer);

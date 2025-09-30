@@ -50,13 +50,13 @@ export default function CreatePage() {
       // Validate file type
       const allowedTypes = ["text/plain", "application/pdf"];
       if (!allowedTypes.includes(file.type)) {
-        setError("Please upload a PDF or TXT file only");
+        setError("Unsupported file type. Only PDF and TXT are allowed");
         return;
       }
 
-      // Validate file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
-        setError("File size must be less than 10MB");
+      // Validate file size (3MB limit on frontend)
+      if (file.size > 3 * 1024 * 1024) {
+        setError("File size must be less than 3MB");
         return;
       }
 
@@ -84,26 +84,31 @@ export default function CreatePage() {
     setIsLoading(true);
 
     try {
-      // Prepare form data
-      const formData = new FormData();
-      if (textContent.trim()) {
-        formData.append("text", textContent);
-      }
+      let response: Response;
+
       if (selectedFile) {
+        const formData = new FormData();
         formData.append("file", selectedFile);
+        formData.append("numQuestions", String(quizSettings.questionCount));
+        formData.append("difficulty", quizSettings.difficulty);
+
+        response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        // Fallback to text-only generation
+        const formData = new FormData();
+        formData.append("text", textContent);
+        response = await fetch(`/api/generate-quiz?numQuestions=${quizSettings.questionCount}&difficulty=${quizSettings.difficulty}`, {
+          method: "POST",
+          body: formData,
+        });
       }
-
-      formData.append("settings", JSON.stringify(quizSettings));
-      formData.append("userId", user.id);
-
-      // API call - replace with real API endpoint
-      const response = await fetch("/api/generate-quiz", {
-        method: "POST",
-        body: formData,
-      });
 
       if (!response.ok) {
-        throw new Error("Failed to generate quiz");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData?.error || "Failed to generate quiz");
       }
 
       const result = await response.json();
@@ -305,7 +310,7 @@ export default function CreatePage() {
                     Generating Quiz...
                   </>
                 ) : (
-                  "Generate Quiz"
+                  selectedFile ? "Upload and Generate Quiz" : "Generate Quiz"
                 )}
               </Button>
 
@@ -313,7 +318,7 @@ export default function CreatePage() {
               <p className="text-xs text-muted-foreground text-center">
                 Your quiz will be generated using AI and saved to your account.
                 <br />
-                Supported formats: PDF and TXT files up to 10MB.
+                Supported formats: PDF and TXT files up to 3MB.
               </p>
             </form>
           </CardContent>
