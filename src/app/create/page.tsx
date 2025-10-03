@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Upload, FileText, Loader2, ChevronDown, Settings } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface QuizSettings {
   questionCount: number;
@@ -36,6 +37,7 @@ export default function CreatePage() {
   
   const { user, loading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -50,13 +52,13 @@ export default function CreatePage() {
       // Validate file type
       const allowedTypes = ["text/plain", "application/pdf"];
       if (!allowedTypes.includes(file.type)) {
-        setError("Unsupported file type. Only PDF and TXT are allowed");
+        setError("Please upload a PDF or TXT file only");
         return;
       }
 
-      // Validate file size (3MB limit on frontend)
-      if (file.size > 3 * 1024 * 1024) {
-        setError("File size must be less than 3MB");
+      // Validate file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        setError("File size must be less than 10MB");
         return;
       }
 
@@ -84,39 +86,58 @@ export default function CreatePage() {
     setIsLoading(true);
 
     try {
-      let response: Response;
-
-      if (selectedFile) {
-        const formData = new FormData();
-        formData.append("file", selectedFile);
-        formData.append("numQuestions", String(quizSettings.questionCount));
-        formData.append("difficulty", quizSettings.difficulty);
-
-        response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-      } else {
-        // Fallback to text-only generation
-        const formData = new FormData();
+      // Prepare form data
+      const formData = new FormData();
+      if (textContent.trim()) {
         formData.append("text", textContent);
-        response = await fetch(`/api/generate-quiz?numQuestions=${quizSettings.questionCount}&difficulty=${quizSettings.difficulty}`, {
-          method: "POST",
-          body: formData,
-        });
+      }
+      if (selectedFile) {
+        formData.append("file", selectedFile);
       }
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData?.error || "Failed to generate quiz");
+      // Build query parameters for the API
+      const queryParams = new URLSearchParams({
+        numQuestions: quizSettings.questionCount.toString(),
+        difficulty: quizSettings.difficulty,
+      });
+
+      // API call to generate quiz
+      const response = await fetch(`/api/generate-quiz?${queryParams}`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const contentType = response.headers.get("content-type");
+      
+      if (!contentType || !contentType.includes("application/json")) {
+        // Response is not JSON, likely an error page
+        const text = await response.text();
+        console.error("Non-JSON response:", text.substring(0, 200));
+        throw new Error("Server error. Please try again or use a smaller file.");
       }
 
       const result = await response.json();
 
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to generate quiz");
+      }
+
+      toast({
+        title: "Quiz created successfully!",
+        description: `"${result.title}" has been added to your library.`,
+      });
+
       // Redirect to quiz detail page or dashboard
       router.push(`/dashboard`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      console.error("Quiz generation error:", err);
+      const errorMessage = err instanceof Error ? err.message : "Something went wrong";
+      setError(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -233,7 +254,6 @@ export default function CreatePage() {
                             <SelectItem value="5">5 questions</SelectItem>
                             <SelectItem value="10">10 questions</SelectItem>
                             <SelectItem value="15">15 questions</SelectItem>
-                            <SelectItem value="20">20 questions</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -252,26 +272,6 @@ export default function CreatePage() {
                             <SelectItem value="easy">Easy</SelectItem>
                             <SelectItem value="medium">Medium</SelectItem>
                             <SelectItem value="hard">Hard</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Question Type */}
-                      <div className="space-y-2">
-                        <Label htmlFor="question-type">Question Type</Label>
-                        <Select
-                          value={quizSettings.questionType}
-                          onValueChange={(value: "multiple-choice" | "true-false" | "mixed") =>
-                            updateSetting("questionType", value)
-                          }
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="multiple-choice">Multiple Choice</SelectItem>
-                            <SelectItem value="true-false">True/False</SelectItem>
-                            <SelectItem value="mixed">Mixed</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -306,11 +306,11 @@ export default function CreatePage() {
               <Button type="submit" className="w-full" disabled={isLoading || (!textContent.trim() && !selectedFile)}>
                 {isLoading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Generating Quiz...
                   </>
                 ) : (
-                  selectedFile ? "Upload and Generate Quiz" : "Generate Quiz"
+                  "Generate Quiz"
                 )}
               </Button>
 
@@ -318,7 +318,7 @@ export default function CreatePage() {
               <p className="text-xs text-muted-foreground text-center">
                 Your quiz will be generated using AI and saved to your account.
                 <br />
-                Supported formats: PDF and TXT files up to 3MB.
+                Supported formats: PDF and TXT files up to 10MB.
               </p>
             </form>
           </CardContent>
