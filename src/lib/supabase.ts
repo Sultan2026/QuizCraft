@@ -20,6 +20,17 @@ export const supabaseHelpers = {
     return data;
   },
 
+  async getUserWithPlan(userId: string) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('subscription_plan')
+      .eq('id', userId)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
   async createUser(email: string) {
     const { data, error } = await supabase
       .from('users')
@@ -144,6 +155,75 @@ export const supabaseHelpers = {
       .eq('id', questionId);
     
     if (error) throw error;
+  },
+
+  // Notes operations
+  async getNotes(userId: string) {
+    const { data, error } = await supabase
+      .from('notes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getNote(noteId: string) {
+    const { data, error } = await supabase
+      .from('notes')
+      .select('*')
+      .eq('id', noteId)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async createNote(userId: string, title: string, content: string) {
+    const { data, error } = await supabase
+      .from('notes')
+      .insert({
+        user_id: userId,
+        title,
+        content
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async updateNote(noteId: string, updates: { title?: string; content?: string }) {
+    const { data, error } = await supabase
+      .from('notes')
+      .update(updates)
+      .eq('id', noteId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteNote(noteId: string) {
+    const { error } = await supabase
+      .from('notes')
+      .delete()
+      .eq('id', noteId);
+    
+    if (error) throw error;
+  },
+
+  async getNotesCount(userId: string) {
+    const { count, error } = await supabase
+      .from('notes')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    return count || 0;
   }
 };
 
