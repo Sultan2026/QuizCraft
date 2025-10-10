@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractPdfText, cleanExtractedText } from "@/lib/file-parser";
+import { requireAuth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,9 @@ async function getCleanTextFromFile(file: File): Promise<string> {
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const user = await requireAuth(request);
+    
     const contentType = request.headers.get("content-type") || "";
     if (!contentType.includes("multipart/form-data")) {
       return NextResponse.json({ error: "Expected multipart/form-data" }, { status: 400 });
@@ -47,16 +51,22 @@ export async function POST(request: NextRequest) {
 
     const cleanedText = await getCleanTextFromFile(file);
 
-    // Forward to quiz generation API
+    // Forward to quiz generation API with authentication
     const url = new URL("/api/generate-quiz", request.url);
     const numQuestions = form.get("numQuestions")?.toString();
     const difficulty = form.get("difficulty")?.toString();
     if (numQuestions) url.searchParams.set("numQuestions", numQuestions);
     if (difficulty) url.searchParams.set("difficulty", difficulty);
 
+    // Get the authorization header from the original request
+    const authHeader = request.headers.get("authorization");
+    
     const resp = await fetch(url.toString(), {
       method: "POST",
-      headers: { "content-type": "text/plain" },
+      headers: { 
+        "content-type": "text/plain",
+        ...(authHeader && { "authorization": authHeader }),
+      },
       body: cleanedText,
     });
 
@@ -67,6 +77,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ...data, bytes: file.size, fileName: file.name });
   } catch (error: any) {
+    // Handle authentication errors
+    if (error instanceof Response) {
+      return error;
+    }
+    
     const message = error?.message || "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
