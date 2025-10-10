@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import pdfParse from "pdf-parse-fork";
 
 import { prisma } from "@/lib/prisma";
@@ -84,39 +84,42 @@ Return ONLY valid JSON with this exact shape:
   return { system, user };
 }
 
-async function callOpenAIForQuiz({ text, numQuestions, difficulty }: { text: string; numQuestions: number; difficulty: Difficulty }) {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  if (!openai.apiKey) {
-    throw new Error("Missing OPENAI_API_KEY environment variable");
+async function callGeminiForQuiz({ text, numQuestions, difficulty }: { text: string; numQuestions: number; difficulty: Difficulty }) {
+  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || "");
+  if (!process.env.GOOGLE_AI_API_KEY) {
+    throw new Error("Missing GOOGLE_AI_API_KEY environment variable");
   }
 
   const { system, user } = buildPrompt({ text, numQuestions, difficulty });
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
-    temperature: 0.4,
-    response_format: { type: "json_object" },
+  // Get the Gemini 2.5 Flash-Lite model
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-2.5-flash-lite",
+    generationConfig: {
+      temperature: 0.4,
+      responseMimeType: "application/json",
+    }
   });
 
-  const content = response.choices[0]?.message?.content || "";
+  const prompt = `${system}\n\n${user}`;
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  const content = response.text();
+
   if (!content) {
-    throw new Error("Empty response from OpenAI");
+    throw new Error("Empty response from Gemini");
   }
 
   let parsed: any;
   try {
     parsed = JSON.parse(content);
   } catch {
-    throw new Error("Failed to parse OpenAI JSON response");
+    throw new Error("Failed to parse Gemini JSON response");
   }
 
   // Minimal validation
   if (!parsed || !Array.isArray(parsed.questions) || parsed.questions.length === 0) {
-    throw new Error("OpenAI returned invalid quiz format");
+    throw new Error("Gemini returned invalid quiz format");
   }
 
   return parsed as { title: string; questions: Array<{ question: string; options: string[]; answer: string }>; };
@@ -134,7 +137,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No input provided" }, { status: 400 });
     }
 
-    const quiz = await callOpenAIForQuiz({ text, numQuestions, difficulty });
+    const quiz = await callGeminiForQuiz({ text, numQuestions, difficulty });
 
     // Save to DB (Prisma) - Note: model is 'Quiz' not 'quizzes'
     const saved = await prisma.quiz.create({
