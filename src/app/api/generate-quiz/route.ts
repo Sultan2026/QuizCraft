@@ -110,16 +110,61 @@ async function callGeminiForQuiz({ text, numQuestions, difficulty }: { text: str
     throw new Error("Empty response from Gemini");
   }
 
-  let parsed: any;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new Error("Failed to parse Gemini JSON response");
+  // Clean the response - remove markdown code blocks if present
+  let cleanedContent = content.trim();
+  
+  // Remove markdown code blocks (```json ... ``` or ``` ... ```)
+  if (cleanedContent.startsWith('```')) {
+    cleanedContent = cleanedContent.replace(/^```(?:json)?\s*\n?/i, '');
+    cleanedContent = cleanedContent.replace(/\n?```\s*$/, '');
+    cleanedContent = cleanedContent.trim();
   }
 
-  // Minimal validation
-  if (!parsed || !Array.isArray(parsed.questions) || parsed.questions.length === 0) {
-    throw new Error("Gemini returned invalid quiz format");
+  // Try to parse the JSON
+  let parsed: any;
+  try {
+    parsed = JSON.parse(cleanedContent);
+  } catch (parseError) {
+    console.error("Failed to parse Gemini response:", cleanedContent.substring(0, 500));
+    
+    // Try to extract JSON from the response using regex as fallback
+    const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch (fallbackError) {
+        throw new Error("Failed to parse Gemini JSON response. The AI returned an invalid format.");
+      }
+    } else {
+      throw new Error("Failed to parse Gemini JSON response. No valid JSON found in response.");
+    }
+  }
+
+  // Validate the parsed response
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error("Gemini returned invalid data structure");
+  }
+
+  if (!Array.isArray(parsed.questions)) {
+    throw new Error("Gemini response missing 'questions' array");
+  }
+
+  if (parsed.questions.length === 0) {
+    throw new Error("Gemini returned zero questions. Please try with different content.");
+  }
+
+  // Validate each question has required fields
+  for (let i = 0; i < parsed.questions.length; i++) {
+    const q = parsed.questions[i];
+    if (!q.question || !Array.isArray(q.options) || !q.answer) {
+      throw new Error(`Question ${i + 1} is missing required fields (question, options, or answer)`);
+    }
+    if (q.options.length < 2) {
+      throw new Error(`Question ${i + 1} must have at least 2 options`);
+    }
+    if (!q.options.includes(q.answer)) {
+      throw new Error(`Question ${i + 1}: answer must match one of the options exactly`);
+    }
   }
 
   return parsed as { title: string; questions: Array<{ question: string; options: string[]; answer: string }>; };
@@ -162,9 +207,8 @@ export async function POST(request: NextRequest) {
       return error;
     }
     
+    console.error("Quiz generation error details:", error);
     const message = error?.message || "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
-
