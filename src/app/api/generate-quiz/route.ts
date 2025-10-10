@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import pdfParse from "pdf-parse-fork";
 
-// If you have a shared Prisma client util, replace this with that import
-// and remove the inline instantiation below.
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth";
 
 export const runtime = "nodejs"; // Required for pdf-parse (Node APIs)
 
@@ -127,6 +124,9 @@ async function callOpenAIForQuiz({ text, numQuestions, difficulty }: { text: str
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const user = await requireAuth(request);
+    
     const { numQuestions, difficulty } = parseQuery(request);
     const { text, sourceType } = await readMultipartOrText(request);
 
@@ -136,17 +136,29 @@ export async function POST(request: NextRequest) {
 
     const quiz = await callOpenAIForQuiz({ text, numQuestions, difficulty });
 
-    // Save to DB (Prisma)
+    // Save to DB (Prisma) - Note: model is 'Quiz' not 'quizzes'
     const saved = await prisma.quiz.create({
       data: {
         title: quiz.title || "Generated Quiz",
         questions: quiz.questions as unknown as any, // Prisma JSON type
         sourceType,
+        userId: user.id, // Include user_id
       },
     });
 
-    return NextResponse.json({ id: saved.id, title: saved.title, questions: quiz.questions, sourceType: saved.sourceType, createdAt: saved.createdAt });
+    return NextResponse.json({ 
+      id: saved.id, 
+      title: saved.title, 
+      questions: quiz.questions, 
+      sourceType: saved.sourceType, 
+      createdAt: saved.createdAt 
+    });
   } catch (error: any) {
+    // Handle authentication errors
+    if (error instanceof Response) {
+      return error;
+    }
+    
     const message = error?.message || "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
