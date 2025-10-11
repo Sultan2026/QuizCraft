@@ -1,18 +1,87 @@
 import pdfParse from "pdf-parse-fork";
 
 export async function extractPdfText(buffer: Buffer): Promise<string> {
-  const result = await pdfParse(buffer);
-  return result.text || "";
+  try {
+    const result = await pdfParse(buffer, {
+      // Enhanced PDF parsing options
+      max: 0, // No page limit
+      version: 'v1.10.100', // Use specific version for stability
+    });
+    
+    if (!result.text) {
+      throw new Error("No text content found in PDF");
+    }
+    
+    return result.text;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`PDF parsing failed: ${error.message}`);
+    }
+    throw new Error("PDF parsing failed due to unknown error");
+  }
 }
 
 export function cleanExtractedText(input: string): string {
   if (!input) return "";
-  // Remove non-printable except common whitespace, collapse spaces/newlines, trim
-  const withoutControl = input.replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F]+/g, " ");
-  const collapsedWhitespace = withoutControl.replace(/\s+/g, " ");
-  // Normalize weird unicode spaces
-  const normalized = collapsedWhitespace.replace(/[\u00A0\u2000-\u200B\u202F\u205F\u3000]/g, " ");
-  return normalized.trim();
+  
+  // Step 1: Remove non-printable characters except common whitespace
+  const withoutControl = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, " ");
+  
+  // Step 2: Normalize unicode spaces and special characters
+  const normalized = withoutControl
+    .replace(/[\u00A0\u2000-\u200B\u202F\u205F\u3000]/g, " ") // Unicode spaces
+    .replace(/[\u2018\u2019]/g, "'") // Smart quotes
+    .replace(/[\u201C\u201D]/g, '"') // Smart double quotes
+    .replace(/[\u2013\u2014]/g, "-") // En/em dashes
+    .replace(/[\u2026]/g, "...") // Ellipsis
+    .replace(/[\u00B7]/g, " "); // Middle dot
+  
+  // Step 3: Collapse multiple whitespace characters
+  const collapsedWhitespace = normalized.replace(/\s+/g, " ");
+  
+  // Step 4: Remove excessive line breaks and normalize paragraphs
+  const normalizedParagraphs = collapsedWhitespace
+    .replace(/\n\s*\n\s*\n+/g, "\n\n") // Max 2 consecutive line breaks
+    .replace(/^\s+|\s+$/g, ""); // Trim start and end
+  
+  // Step 5: Final cleanup - ensure minimum content quality
+  const finalText = normalizedParagraphs.trim();
+  
+  // Validate minimum content length
+  if (finalText.length < 10) {
+    throw new Error("Extracted text is too short to be meaningful");
+  }
+  
+  return finalText;
+}
+
+// Additional utility functions for file processing
+export function validateFileType(fileName: string, mimeType?: string): boolean {
+  const nameLower = fileName.toLowerCase();
+  const validExtensions = ['.pdf', '.txt'];
+  const validMimeTypes = ['application/pdf', 'text/plain'];
+  
+  const hasValidExtension = validExtensions.some(ext => nameLower.endsWith(ext));
+  const hasValidMimeType = !mimeType || validMimeTypes.includes(mimeType);
+  
+  return hasValidExtension && hasValidMimeType;
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+export function estimateProcessingTime(fileSize: number, fileType: string): number {
+  // Rough estimation in seconds
+  const baseTime = fileType === 'application/pdf' ? 2 : 0.5; // PDF takes longer
+  const sizeFactor = Math.log(fileSize / 1024) / Math.log(1024); // Logarithmic scaling
+  return Math.max(baseTime, baseTime + sizeFactor);
 }
 
 
