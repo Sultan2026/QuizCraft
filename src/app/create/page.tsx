@@ -4,6 +4,7 @@ import type React from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,8 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Upload, FileText, Loader2, ChevronDown, Settings } from "lucide-react";
+import { Upload, FileText, Loader2, ChevronDown, Settings, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatFileSize, validateFileType, extractPdfText } from "@/lib/file-parser";
 
 interface QuizSettings {
   questionCount: number;
@@ -49,21 +51,24 @@ export default function CreatePage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
-      const allowedTypes = ["text/plain", "application/pdf"];
-      if (!allowedTypes.includes(file.type)) {
-        setError("Please upload a PDF or TXT file only");
+      // Enhanced file validation
+      const maxSize = 3 * 1024 * 1024; // 3MB
+      const isValidType = validateFileType(file.name, file.type);
+      
+      if (!isValidType) {
+        setError(`Unsupported file type. Please upload only PDF (.pdf) or TXT (.txt) files. Received: ${file.type || 'unknown type'}`);
+        setSelectedFile(null);
         return;
       }
 
-      // Validate file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
-        setError("File size must be less than 10MB");
+      if (file.size > maxSize) {
+        setError(`File size exceeds 3MB limit. Current size: ${formatFileSize(file.size)}`);
+        setSelectedFile(null);
         return;
       }
 
       setSelectedFile(file);
-      setError("");
+      setError(""); // Clear any previous errors
     }
   };
 
@@ -86,13 +91,32 @@ export default function CreatePage() {
     setIsLoading(true);
 
     try {
-      // Prepare form data
-      const formData = new FormData();
-      if (textContent.trim()) {
-        formData.append("text", textContent);
-      }
+      let finalTextContent = textContent.trim();
+
+      // Handle file upload - extract text if it's a PDF
       if (selectedFile) {
-        formData.append("file", selectedFile);
+        if (selectedFile.type === "application/pdf" || selectedFile.name.toLowerCase().endsWith(".pdf")) {
+          // Extract text from PDF using the new API
+          try {
+            const extractedText = await extractPdfText(selectedFile);
+            finalTextContent = extractedText;
+          } catch (pdfError) {
+            throw new Error(`Failed to extract text from PDF: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}`);
+          }
+        } else if (selectedFile.type === "text/plain" || selectedFile.name.toLowerCase().endsWith(".txt")) {
+          // Read text file content
+          try {
+            const textContent = await selectedFile.text();
+            finalTextContent = textContent;
+          } catch (textError) {
+            throw new Error(`Failed to read text file: ${textError instanceof Error ? textError.message : 'Unknown error'}`);
+          }
+        }
+      }
+
+      // Validate that we have content
+      if (!finalTextContent.trim()) {
+        throw new Error("No content available for quiz generation");
       }
 
       // Build query parameters for the API
@@ -101,10 +125,20 @@ export default function CreatePage() {
         difficulty: quizSettings.difficulty,
       });
 
-      // API call to generate quiz
+      // Get the current session token for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Authentication required. Please log in again.");
+      }
+
+      // API call to generate quiz with text content
       const response = await fetch(`/api/generate-quiz?${queryParams}`, {
         method: "POST",
-        body: formData,
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'text/plain',
+        },
+        body: finalTextContent,
       });
 
       const contentType = response.headers.get("content-type");
@@ -193,8 +227,8 @@ export default function CreatePage() {
                 </div>
               </div>
 
-              {/* File Upload Section */}
-              <div className="space-y-2">
+              {/* Enhanced File Upload Section */}
+              <div className="space-y-3">
                 <Label htmlFor="file">Upload a File</Label>
                 <div className="relative">
                   <Input
@@ -203,23 +237,54 @@ export default function CreatePage() {
                     accept=".pdf,.txt"
                     onChange={handleFileChange}
                     className="cursor-pointer"
+                    disabled={isLoading}
                   />
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     {!selectedFile && (
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Upload className="h-4 w-4" />
-                        <span className="text-sm">Choose PDF or TXT file</span>
+                        <span className="text-sm">Choose PDF or TXT file (max 3MB)</span>
                       </div>
                     )}
                   </div>
                 </div>
+                
+                {/* Enhanced File Information Display */}
                 {selectedFile && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileText className="h-4 w-4" />
-                    <span>{selectedFile.name}</span>
-                    <span className="text-xs">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
+                  <div className="border rounded-lg p-3 bg-muted/30">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0">
+                        {selectedFile.type === 'application/pdf' ? (
+                          <FileText className="h-5 w-5 text-red-500" />
+                        ) : (
+                          <FileText className="h-5 w-5 text-blue-500" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm truncate">{selectedFile.name}</span>
+                          <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatFileSize(selectedFile.size)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                            {selectedFile.type === 'application/pdf' ? 'PDF Document' : 'Text File'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
+                
+                {/* File Upload Help Text */}
+                <div className="text-xs text-muted-foreground">
+                  <p>Supported formats: PDF and TXT files up to 10MB</p>
+                  <p>PDF files will have their text extracted automatically</p>
+                </div>
               </div>
 
               <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
@@ -295,31 +360,51 @@ export default function CreatePage() {
                 </CollapsibleContent>
               </Collapsible>
 
-              {/* Error Message */}
+              {/* Enhanced Error Message Display */}
               {error && (
-                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
-                  {error}
+                <div className="border border-destructive/20 bg-destructive/10 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-destructive">
+                      <p className="font-medium">Upload Error</p>
+                      <p className="text-xs mt-1">{error}</p>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {/* Submit Button */}
-              <Button type="submit" className="w-full" disabled={isLoading || (!textContent.trim() && !selectedFile)}>
+              {/* Enhanced Submit Button */}
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isLoading || (!textContent.trim() && !selectedFile)}
+                size="lg"
+              >
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Generating Quiz...
+                    {selectedFile ? "Processing File & Generating Quiz..." : "Generating Quiz..."}
                   </>
                 ) : (
-                  "Generate Quiz"
+                  <>
+                    {selectedFile ? (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload and Generate Quiz
+                      </>
+                    ) : (
+                      "Generate Quiz"
+                    )}
+                  </>
                 )}
               </Button>
 
-              {/* Help Text */}
-              <p className="text-xs text-muted-foreground text-center">
-                Your quiz will be generated using AI and saved to your account.
-                <br />
-                Supported formats: PDF and TXT files up to 10MB.
-              </p>
+              {/* Enhanced Help Text */}
+              <div className="text-xs text-muted-foreground text-center space-y-1">
+                <p>Your quiz will be generated using AI and saved to your account.</p>
+                  <p>Supported formats: PDF and TXT files up to 3MB.</p>
+                <p className="text-green-600">✓ Files are processed securely and text is extracted automatically</p>
+              </div>
             </form>
           </CardContent>
         </Card>
