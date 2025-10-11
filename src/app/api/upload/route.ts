@@ -4,7 +4,7 @@ import { requireAuth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
-const MAX_BYTES = 10 * 1024 * 1024; // 10MB (increased from 3MB)
+const MAX_BYTES = 3 * 1024 * 1024; // 3MB
 const SUPPORTED_TYPES = ["application/pdf", "text/plain"]; // pdf, txt
 const SUPPORTED_EXTENSIONS = [".pdf", ".txt"];
 
@@ -14,7 +14,7 @@ async function getCleanTextFromFile(file: File): Promise<string> {
 
   // Enhanced file size validation
   if (buffer.byteLength > MAX_BYTES) {
-    throw new Error(`File exceeds 10MB limit. Current size: ${(buffer.byteLength / 1024 / 1024).toFixed(2)}MB`);
+    throw new Error(`File exceeds 3MB limit. Current size: ${(buffer.byteLength / 1024 / 1024).toFixed(2)}MB`);
   }
 
   // Enhanced file type validation

@@ -52,7 +52,7 @@ export default function CreatePage() {
     const file = e.target.files?.[0];
     if (file) {
       // Enhanced file validation
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      const maxSize = 3 * 1024 * 1024; // 3MB
       const isValidType = validateFileType(file.name, file.type);
       
       if (!isValidType) {
@@ -62,7 +62,7 @@ export default function CreatePage() {
       }
 
       if (file.size > maxSize) {
-        setError(`File size exceeds 10MB limit. Current size: ${formatFileSize(file.size)}`);
+        setError(`File size exceeds 3MB limit. Current size: ${formatFileSize(file.size)}`);
         setSelectedFile(null);
         return;
       }
@@ -223,7 +223,7 @@ export default function CreatePage() {
                     {!selectedFile && (
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Upload className="h-4 w-4" />
-                        <span className="text-sm">Choose PDF or TXT file (max 10MB)</span>
+                        <span className="text-sm">Choose PDF or TXT file (max 3MB)</span>
                       </div>
                     )}
                   </div>
@@ -382,7 +382,7 @@ export default function CreatePage() {
               {/* Enhanced Help Text */}
               <div className="text-xs text-muted-foreground text-center space-y-1">
                 <p>Your quiz will be generated using AI and saved to your account.</p>
-                <p>Supported formats: PDF and TXT files up to 10MB.</p>
+                  <p>Supported formats: PDF and TXT files up to 3MB.</p>
                 <p className="text-green-600">✓ Files are processed securely and text is extracted automatically</p>
               </div>
             </form>
