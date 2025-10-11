@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { extractPdfText, cleanExtractedText } from "@/lib/file-parser";
+import { cleanExtractedText } from "@/lib/file-parser";
 import { requireAuth } from "@/lib/auth";
+import pdfParse from "pdf-parse-fork";
 
 export const runtime = "nodejs";
 
@@ -30,7 +31,13 @@ async function getCleanTextFromFile(file: File): Promise<string> {
   let rawText = "";
   try {
     if (type === "application/pdf") {
-      rawText = await extractPdfText(buffer);
+      // Use pdf-parse-fork directly in server-side context
+      const result = await pdfParse(buffer, {
+        max: 0, // No page limit
+        version: 'v1.10.100', // Use specific version for stability
+      });
+      
+      rawText = result.text || "";
       if (!rawText || rawText.trim().length === 0) {
         throw new Error("PDF file appears to be empty or contains no extractable text");
       }

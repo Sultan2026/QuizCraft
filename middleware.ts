@@ -12,6 +12,7 @@ export async function middleware(request: NextRequest) {
   // Protect API routes that require authentication
   if (pathname.startsWith('/api/generate-quiz') || 
       pathname.startsWith('/api/upload') ||
+      pathname.startsWith('/api/parse-pdf') ||
       pathname.startsWith('/api/notes')) {
     
     const authHeader = request.headers.get('authorization');
@@ -47,6 +48,7 @@ export const config = {
   matcher: [
     '/api/generate-quiz/:path*',
     '/api/upload/:path*',
+    '/api/parse-pdf/:path*',
     '/api/notes/:path*',
   ],
 };

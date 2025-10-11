@@ -15,7 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Upload, FileText, Loader2, ChevronDown, Settings, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { formatFileSize, validateFileType } from "@/lib/file-parser";
+import { formatFileSize, validateFileType, extractPdfText } from "@/lib/file-parser";
 
 interface QuizSettings {
   questionCount: number;
@@ -91,13 +91,32 @@ export default function CreatePage() {
     setIsLoading(true);
 
     try {
-      // Prepare form data
-      const formData = new FormData();
-      if (textContent.trim()) {
-        formData.append("text", textContent);
-      }
+      let finalTextContent = textContent.trim();
+
+      // Handle file upload - extract text if it's a PDF
       if (selectedFile) {
-        formData.append("file", selectedFile);
+        if (selectedFile.type === "application/pdf" || selectedFile.name.toLowerCase().endsWith(".pdf")) {
+          // Extract text from PDF using the new API
+          try {
+            const extractedText = await extractPdfText(selectedFile);
+            finalTextContent = extractedText;
+          } catch (pdfError) {
+            throw new Error(`Failed to extract text from PDF: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}`);
+          }
+        } else if (selectedFile.type === "text/plain" || selectedFile.name.toLowerCase().endsWith(".txt")) {
+          // Read text file content
+          try {
+            const textContent = await selectedFile.text();
+            finalTextContent = textContent;
+          } catch (textError) {
+            throw new Error(`Failed to read text file: ${textError instanceof Error ? textError.message : 'Unknown error'}`);
+          }
+        }
+      }
+
+      // Validate that we have content
+      if (!finalTextContent.trim()) {
+        throw new Error("No content available for quiz generation");
       }
 
       // Build query parameters for the API
@@ -112,13 +131,14 @@ export default function CreatePage() {
         throw new Error("Authentication required. Please log in again.");
       }
 
-      // API call to generate quiz
+      // API call to generate quiz with text content
       const response = await fetch(`/api/generate-quiz?${queryParams}`, {
         method: "POST",
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'text/plain',
         },
-        body: formData,
+        body: finalTextContent,
       });
 
       const contentType = response.headers.get("content-type");

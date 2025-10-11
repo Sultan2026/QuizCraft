@@ -1,23 +1,30 @@
-import pdfParse from "pdf-parse-fork";
+// Client-side file parser utilities
+// PDF parsing is now handled server-side via API route
 
-export async function extractPdfText(buffer: Buffer): Promise<string> {
+export async function extractPdfText(file: File): Promise<string> {
   try {
-    const result = await pdfParse(buffer, {
-      // Enhanced PDF parsing options
-      max: 0, // No page limit
-      version: 'v1.10.100', // Use specific version for stability
+    // Create FormData to send file to API
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Call the server-side PDF parsing API
+    const response = await fetch('/api/parse-pdf', {
+      method: 'POST',
+      body: formData,
     });
-    
-    if (!result.text) {
-      throw new Error("No text content found in PDF");
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Failed to parse PDF file');
     }
-    
+
     return result.text;
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(`PDF parsing failed: ${error.message}`);
     }
-    throw new Error("PDF parsing failed due to unknown error");
+    throw new Error('PDF parsing failed due to unknown error');
   }
 }
 
