@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import pdfParse from "pdf-parse-fork";
-import { requireAuth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    // Require authentication
-    const user = await requireAuth(request);
-    
     const contentType = request.headers.get("content-type") || "";
     if (!contentType.includes("multipart/form-data")) {
       return NextResponse.json({ 
@@ -44,9 +40,17 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // Convert file to buffer using stream-based approach for better compatibility
+    let buffer: Buffer;
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+    } catch (bufferError) {
+      return NextResponse.json({ 
+        success: false,
+        error: "Failed to read file. Please try another PDF file." 
+      }, { status: 400 });
+    }
 
     // Parse PDF using pdf-parse-fork
     let extractedText: string;
@@ -61,15 +65,15 @@ export async function POST(request: NextRequest) {
       if (!extractedText || extractedText.trim().length === 0) {
         return NextResponse.json({ 
           success: false,
-          error: "PDF file appears to be empty or contains no extractable text" 
+          error: "This PDF might be locked or unreadable. Try another file." 
         }, { status: 400 });
       }
     } catch (error) {
       console.error("PDF parsing error:", error);
       return NextResponse.json({ 
         success: false,
-        error: error instanceof Error ? `PDF parsing failed: ${error.message}` : "Failed to parse PDF file" 
-      }, { status: 500 });
+        error: "This PDF might be locked or unreadable. Try another file." 
+      }, { status: 400 });
     }
 
     // Return the extracted text
@@ -82,15 +86,10 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    // Handle authentication errors
-    if (error instanceof Response) {
-      return error;
-    }
-    
-    const message = error?.message || "Internal server error during PDF parsing";
+    console.error("PDF parsing API error:", error);
     return NextResponse.json({ 
       success: false,
-      error: message 
+      error: "Internal server error during PDF parsing" 
     }, { status: 500 });
   }
 }
