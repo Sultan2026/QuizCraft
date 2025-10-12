@@ -75,9 +75,9 @@ Return ONLY valid JSON with this exact shape:
   "title": string, // a concise quiz title
   "questions": [
     {
-      "question": string,
+      "question_text": string,
       "options": [string, string, string, string],
-      "answer": string // must exactly match one of the options
+      "correct_answer": string // must exactly match one of the options
     }
   ]
 }`;
@@ -156,18 +156,18 @@ async function callGeminiForQuiz({ text, numQuestions, difficulty }: { text: str
   // Validate each question has required fields
   for (let i = 0; i < parsed.questions.length; i++) {
     const q = parsed.questions[i];
-    if (!q.question || !Array.isArray(q.options) || !q.answer) {
-      throw new Error(`Question ${i + 1} is missing required fields (question, options, or answer)`);
+    if (!q.question_text || !Array.isArray(q.options) || !q.correct_answer) {
+      throw new Error(`Question ${i + 1} is missing required fields (question_text, options, or correct_answer)`);
     }
     if (q.options.length < 2) {
       throw new Error(`Question ${i + 1} must have at least 2 options`);
     }
-    if (!q.options.includes(q.answer)) {
-      throw new Error(`Question ${i + 1}: answer must match one of the options exactly`);
+    if (!q.options.includes(q.correct_answer)) {
+      throw new Error(`Question ${i + 1}: correct_answer must match one of the options exactly`);
     }
   }
 
-  return parsed as { title: string; questions: Array<{ question: string; options: string[]; answer: string }>; };
+  return parsed as { title: string; questions: Array<{ question_text: string; options: string[]; correct_answer: string }>; };
 }
 
 export async function POST(request: NextRequest) {
@@ -188,8 +188,11 @@ export async function POST(request: NextRequest) {
     const saved = await prisma.quiz.create({
       data: {
         title: quiz.title || "Generated Quiz",
-        questions: quiz.questions as unknown as any, // Prisma JSON type
-        sourceType,
+        questions: { create: quiz.questions.map(q => ({
+          question_text: q.question,
+          correct_answer: q.answer,
+          options: q.options
+        })) },
         userId: user.id, // Include user_id
       },
     });
